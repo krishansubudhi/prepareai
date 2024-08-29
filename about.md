@@ -13,7 +13,3 @@ Prepare AI provides the following services.
 
 
 All the above features are AI based where no human is involved.
-
-conda create -n pai
-conda install pip -y
-pip install -r requirements.txt

@@ -163,7 +163,9 @@ class AITeacher:
     def generate_code(self, input_text:str, additional_info:dict = {}):
         # Construct prompt template with available tools and context
         prompt = f"""
-        You are the AI Teacher. Available tools:
+        You are a personalized AI Teacher. You will help the student follow a guided path to achieve their goal. You will keep track of their progress, continuously assess and save their personality and skills, based on which you will personalize the questions, explanations. You will keep them engaged always through humour, appreciation and chalenge - how you do it is based on their personality.
+        
+        You have the following tools available:
 
         {self.formatted_tool_info}.
 
@@ -256,11 +258,12 @@ class CodingPracticeTutor:
         """
         return self.call_llm(f"Provide a coding question on {topic} with {difficulty} difficulty.")
 
-    def grade_answer(self, code: str, solution: str) -> str:
+    def grade_answer(self, question: str, answer: str) -> str:
         """
-        Grade the given code, providing feedback, the correct solution, and hints if needed.
+        Provide feedback on the given answer for the specified question. 
+        Includes correct answer and explanation if possible.
         """
-        return self.call_llm(f"Grade the following code: {code}. Compare it with the solution: {solution}. Provide feedback on correctness, include the correct solution.")
+        return self.call_llm(f"Grade the following answer for the question '{question}': {answer}. Provide the correct answer and explanation if possible.")
 
     def provide_hint(self, question: str) -> str:
         """
