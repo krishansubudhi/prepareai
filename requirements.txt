@@ -1,5 +1,8 @@
+Libraries
 openai
 pandas
 notebook
 python-dotenv
 ipython
+
+Additionally, ensure open ai key set up
