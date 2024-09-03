@@ -1,98 +1,63 @@
 from openai import OpenAI
 
 import re
+from typing import Any
 import pickle
-import inspect
 from datetime import datetime
-from IPython.display import display, HTML, Image, Markdown
+from IPython.display import display, Markdown
+from tool import Tool
+import planner_tool
+import memory_tool
+import json
 
-def get_tool_metadata(tool):
-    """
-    Extracts metadata from a tool instance, including function names, signatures, and docstrings.
-    
-    Args:
-    - tool: The instance of the tool to inspect.
+from dataclasses import dataclass, fields, MISSING
 
-    Returns:
-    - A dictionary mapping function names to tuples of their signatures and docstrings.
-    """
-    tool_metadata = {}
-    
+def format_metadata_openapi(tool_name: str, metadata: str) -> str:
+    # Indent each line of the metadata by 4 spaces
+    indented_metadata = "\n".join("    " + line for line in metadata.splitlines())
+    # Combine the tool name with the indented metadata
+    return f"- '{tool_name}':\n\n{indented_metadata}"
 
-    # Iterate over all attributes of the tool
-    for name in dir(tool):
-        if name.startswith('_'):
-            continue
-        attr = getattr(tool, name, None)
-        if callable(attr):
-            try:
-                # Inspect the method if it's callable
-                signature = inspect.signature(attr)
-                docstring = inspect.getdoc(attr)
-                tool_metadata[name] = {
-                    'signature': str(signature),
-                    'docstring': docstring or ""
-                }
-            except Exception as e:
-                print(f"Error processing method {name}: {e}")
-    
-    return tool_metadata
-
-
-def format_metadata_openapi(tool_name: str, metadata: dict) -> str:
-    """
-    Formats the metadata for tools into a compact OpenAPI-like string.
-
-    Args:
-    - tool_name: The name of the tool.
-    - metadata: Dictionary mapping function names to their metadata.
-
-    Returns:
-    - A formatted string representation of the metadata in OpenAPI format.
-    """
-    output = [f"{tool_name}:"]
-    
-    for name, info in metadata.items():
-        output.append(f"  {name}:{info['signature']}  # {info['docstring']}")
-
-    return "\n".join(output)
 
 class Orchestrator:
-    def __init__(self):
-
-        self.memory_manager = MemoryManager()
+    def __init__(self, session_name ):
+        self.session_name = session_name
+        self.memory_manager = memory_tool.MemoryManager()
         self.user_profile_manager = UserProfileManager()
         self.user_skillset_manager = UserSkillsetManager()
-        self.mcq_examiner = MCQExaminer(self.call_llm)
-        self.coding_practice_tutor = CodingPracticeTutor(self.call_llm)
+        self.mcq_examiner = MCQExaminer(self._call_llm)
+        self.coding_practice_tutor = CodingPracticeTutor(self._call_llm)
+        self.concept_tutor = ConceptTutor(self._call_llm)
         self.client = OpenAI()
         self.chat_session = ChatSession()
         self.responder = Responder(chat_session = self.chat_session)
+        self.learning_plan_manager = planner_tool.LearningPlanManager(self._call_llm)
         self.init_ai_teacher()
 
     def init_ai_teacher(self):
         self.tools = {
             "MemoryManager": self.memory_manager,
-            "UserProfileManager": self.user_profile_manager,
-            "UserSkillsetManager": self.user_skillset_manager,
             "MCQExaminer": self.mcq_examiner,
             "CodingPracticeTutor": self.coding_practice_tutor,
+            "ConceptTutor": self.concept_tutor,
             "Responder": self.responder,
+            "LearningPlanManager": self.learning_plan_manager
         }
         
 
         self.ai_teacher = AITeacher(
-            call_llm=self.call_llm,
+            _call_llm=self._call_llm,
             chat_session = self.chat_session,
             tools= self.tools
         )
 
-        self.ai_teacher.tools['AITeacher'] = self.ai_teacher
+        # print(self.tools)
+        # self.ai_teacher.tools['AITeacher'] = self.ai_teacher
 
-    def call_llm(self, prompt):
+    def _call_llm(self, prompt):
         # Replace with actual call to an LLM API, e.g., OpenAI's GPT
         completion = self.client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful tutor."},
                 {
@@ -106,22 +71,9 @@ class Orchestrator:
 
     def process_user_input(self, user_input):
         # Calls the AI Teacher with the necessary context
-        code_to_execute = self.ai_teacher.generate_code(user_input)
         self.chat_session.update_session("student", user_input)
-
-        # Extract code from Markdown (assuming code is enclosed in triple backticks)
-        code_pattern = re.compile(r'```(?:python)?\n(.*?)\n```', re.DOTALL)
-        match = code_pattern.search(code_to_execute)
-        
-        if match:
-            code = match.group(1)
-            # Display the code (optional)
-            display(Markdown(f"```python\n{code}\n```"))
-            exec(code)  # Execute the extracted code
-        else:
-            print("No valid code block found.")
-        
-        self.save_state('states/current.pkl')
+        self.ai_teacher.process(user_input)
+        self.save_state(f'states/{self.session_name}.pkl')
 
     def save_state(self, filename):
         """ Save the state of the Orchestrator to a file. """
@@ -130,82 +82,114 @@ class Orchestrator:
             'user_profile_manager': self.user_profile_manager,
             'user_skillset_manager': self.user_skillset_manager,
             'chat_session': self.chat_session,
+            'learning_plan':self.learning_plan_manager.root
         }
         with open(filename, 'wb') as file:
             pickle.dump(state, file)
 
     @staticmethod
-    def load_state(filename):
+    def load_session(session_name, root = 'states'):
         """ Load the state of the Orchestrator from a file. """
-        with open(filename, 'rb') as file:
+        with open(f'{root}/{session_name}.pkl', 'rb') as file:
             state = pickle.load(file)
         
         # Reconstruct instances that need to be reinitialized
-        orc = Orchestrator()
+        orc = Orchestrator(session_name)
         orc.memory_manager = state['memory_manager']
         orc.user_profile_manager = state['user_profile_manager']
         orc.user_skillset_manager = state['user_skillset_manager']
         orc.chat_session = state['chat_session']
+        orc.responder = Responder(chat_session = orc.chat_session)
+        orc.learning_plan_manager.root = state['learning_plan']
         orc.init_ai_teacher()
 
         return orc
 
 
-class AITeacher:
-    def __init__(self, call_llm, chat_session, tools):
-        self.call_llm = call_llm
+class AITeacher(Tool):
+    def __init__(self, _call_llm, chat_session, tools):
+        self._call_llm = _call_llm
         self.tools = tools
+        self.tools['AITeacher'] = self # keep yourself also as a tool.
         self.chat_session = chat_session
         # print('fetching tool metadata')
-        self.tool_metadata = {tool:get_tool_metadata(self.tools[tool]) for tool in self.tools}
-        self.formatted_tool_info = '\n'.join([format_metadata_openapi(tool, tool_metadata) for tool, tool_metadata in self.tool_metadata.items()])
+
+    def _get_formatted_tool_info(self):
+        tool_metadata = {tool_name:tool._get_tool_metadata() for tool_name, tool in self.tools.items()}
+        return '\n\n'.join([format_metadata_openapi(tool_name, tool_metadata) for tool_name, tool_metadata in tool_metadata.items()])
                                              
-    def generate_code(self, input_text:str, additional_info:dict = {}):
+    def _get_prompt(self, input_text:str, additional_info:dict = {}):
         # Construct prompt template with available tools and context
-        prompt = f"""
-        You are a personalized AI Teacher. You will help the student follow a guided path to achieve their goal. You will keep track of their progress, continuously assess and save their personality and skills, based on which you will personalize the questions, explanations. You will keep them engaged always through humour, appreciation and chalenge - how you do it is based on their personality.
+        prompt = f'''
+        You are an AI Teacher guiding a student toward their goals. Prepare customized plans, track their progress and skills, and personalize your responses using humor, challenges, and appreciation based on their personality ,goal and progreass.
+
+        # Tools Available:
+        {self._get_formatted_tool_info()}
+
+        # Memory: 
+        {self.tools['MemoryManager'].get_memory_snapshot()}
+
+        # Additional Context Gathered:
+
+        # Conversation History (Last 10): 
+        {'- '+ '\n\n- '.join(self.chat_session.get_last_n_messages(11)[:-1])}
+
+        # Additional Info: 
+        {additional_info}
+
+        # Learning Plan:
+        {self.tools['LearningPlanManager'].get_plan_tree_markdown()} 
         
-        You have the following tools available:
+        # Current Time: {datetime.now()}
 
-        {self.formatted_tool_info}.
 
-        Memory: {self.tools['MemoryManager'].memory}
-        Chat history: {self.chat_session.get_last_n_messages(5)}
-        Additional Information: {additional_info}
-        Current time: {datetime.now()}
-        User Input: {input_text}
+        # Instructions:
 
-        Generate only Python code that to call the appropriate tools by calling `self.tools['toolname'].method(args)` and respond to the user.
-        Do not write new methods or classes.
-        Do not use tools/methods other than the ones available.
-        Use responder to respond the user. Update memory if necessary to store relevant information. 
-        """
+        - Generate Only Python Code to call the appropriate tools only using self.tools['<toolname>'].method(args).
+        - No New Methods/Classes: Only use provided tools/methods.
+        - Memory: Store short but important information in memory which might be needed later.
+        - LearningPlan: Focus on locking a customized learning plan to track progress.
+        - Confirmation: Confirm with user before changing anything.
+        - Responder: User responder to respond to the user. Always respond with a question.
+        - Code guidelines: Always end the python code with either a Responder or AITeacher tool call.
 
+        # Here is the last input from student.
+
+        Student: {input_text}
+
+        # Plan code: 
+
+        '''
+        prompt = re.sub(r'^ {8}', '', prompt, flags=re.MULTILINE)
+        return prompt
+
+    def process(self, input_text:str, additional_info:dict = {str, Any}):
+        '''
+        Plans and executes the next steps based on input text and additional_info, using available tools and past conversation history.
+        Args:
+            input_text= User's input
+            additional_info= Placeholder to pass information during recursive calls.
+        '''
         # display(Markdown(prompt))
-        code = self.call_llm(prompt)
-        return code  # This should return Python code to be executed by the Orchestrator
+        code = self._call_llm(self._get_prompt(input_text, additional_info))
+        self._execute_code(code)
+        # return code  # This should return Python code to be executed by the Orchestrator
 
-class Responder:
+
+class Responder(Tool):
     def __init__(self, chat_session):
         self.chat_session = chat_session
 
-    def respond(self, message):
-        # Append message to the list of messages to be yielded by the generator
+    def respond(self, message:str):
+        '''Respond to the user with markdown message'''
         self.chat_session.update_session("Tutor", message)
         display(Markdown(f"**PrepareAI:** {message}"))
 
+from datetime import datetime, timedelta
+from typing import Any, Dict, Tuple
 
-class MemoryManager:
-    def __init__(self):
-        self.memory = {}
-    
-    def update_memory(self, key, value):
-        self.memory[key] = value
-    
-    def get_memory(self, key):
-        return self.memory.get(key, None)
 
-class UserProfileManager:
+class UserProfileManager(Tool):
     def __init__(self):
         self.profile = {}
     
@@ -215,61 +199,106 @@ class UserProfileManager:
     def get_profile(self, key):
         return self.profile.get(key, None)
 
-class UserSkillsetManager:
+class UserSkillsetManager(Tool):
     def __init__(self):
         self.skills = {}
     
     def update_skill(self, skill:str, level:str):
+        '''Update relevant skill and it's level to track progress and customize responses.'''
         self.skills[skill] = level
     
     def get_skills(self):
+        '''Fetch all skills.'''
         return self.skills
 
-class MCQExaminer:
-    def __init__(self, call_llm):
-        self.call_llm = call_llm
+
+class MCQExaminer(Tool):
+    def __init__(self, _call_llm):
+        self._call_llm = _call_llm
     
     def get_question(self, subject: str, difficulty: str) -> str:
         """
         Get an MCQ question based on the subject and difficulty level.
         """
-        return self.call_llm(f"Provide an MCQ question on {subject} with {difficulty} difficulty.")
+        return self._call_llm(f"Provide an MCQ question on {subject} with {difficulty} difficulty.  Do not output answer.")
 
     def grade_answer(self, question: str, answer: str) -> str:
         """
         Provide feedback on the given answer for the specified question. 
         Includes correct answer and explanation if possible.
         """
-        return self.call_llm(f"Grade the following answer for the question '{question}': {answer}. Provide the correct answer and explanation if possible.")
+        return self._call_llm(f'''Grade the following answer for the question '{question}'.
+        User's Answer: {answer}. 
+        
+        Format:
+        *Score* = <Based on the difficulty and answer, provide the score between [0,1] for each question. Score format is score/max_score>
+
+        *Explanation* = <explanation of the score>
+
+        *Correct answer* = <Correct answer to the question and diff with user's answer>
+        ''')
 
     def provide_hint(self, question: str) -> str:
         """
         Provide a hint related to a specific MCQ question.
         """
-        return self.call_llm(f"Provide a hint for the MCQ question: '{question}'. Include hint instructions to guide the user.")
+        return self._call_llm(f"Provide a hint for the MCQ question: '{question}'. Include hint instructions to guide the user.")
 
-class CodingPracticeTutor:
-    def __init__(self, call_llm):
-        self.call_llm = call_llm
+class CodingPracticeTutor(Tool):
+    def __init__(self, _call_llm):
+        self._call_llm = _call_llm
     
     def get_question(self, topic: str, difficulty: str) -> str:
         """
         Get a coding question based on the topic and difficulty level.
         """
-        return self.call_llm(f"Provide a coding question on {topic} with {difficulty} difficulty.")
+        return self._call_llm(f"Provide a coding question on {topic} with {difficulty} difficulty. Do not output answer.")
 
     def grade_answer(self, question: str, answer: str) -> str:
         """
         Provide feedback on the given answer for the specified question. 
         Includes correct answer and explanation if possible.
         """
-        return self.call_llm(f"Grade the following answer for the question '{question}': {answer}. Provide the correct answer and explanation if possible.")
+        return self._call_llm(f'''Grade the following answer for the question '{question}'.
+        User's Answer: {answer}. 
+        
+        Format:
+        *Score* = <Based on the difficulty and answer, provide the score between[ 0,5]. Score format is score/max_score>
+
+        *Explanation* = <explanation of the score>
+
+        *Correct answer* = <Correct answer to the question and diff with user's answer>
+        ''')
 
     def provide_hint(self, question: str) -> str:
         """
         Provide a hint related to a specific coding problem.
         """
-        return self.call_llm(f"Provide a hint for the coding problem described by: '{question}'. Include hint instructions to guide the user.")
+        return self._call_llm(f"Provide a hint for the coding problem described by: '{question}'. Include hint instructions to guide the user.")
+
+
+class ConceptTutor(Tool):
+    def __init__(self, _call_llm):
+        self._call_llm = _call_llm
+    
+    def teach(self, topic: str, context: str) -> str:
+        """
+        Teach the concepts of a topic. Personalized based on context. Keep it concise but helpful. Adjust difficulty based on context.
+        """
+        return self._call_llm(f'''You are a friendly AI tutor who can explain concepts  personalized based on the concept. 
+        Topic: '{topic}' 
+        Context: {context}
+        Explanation: ''')
+
+    def clear_doubts(self,  doubt: str, context: str) -> str:
+        """
+        clear doubt based on the give context. 
+        """
+        return self._call_llm(f'''
+        You are a friendly AI tutor who can clear doubts. Keep it concise but helpful. Adjust difficulty based on context.
+        Context: {context}
+        Doubt: {doubt}
+        Clarification: ''')
 
 
 class ChatSession:
@@ -277,7 +306,7 @@ class ChatSession:
         self.session_history = []
     
     def update_session(self, role, message):
-        self.session_history.append(f"{role}: {message}")
+        self.session_history.append(f"*{role}*: {message}")
     
     def get_last_n_messages(self, n) ->list[str]:
         return self.session_history[-n:]

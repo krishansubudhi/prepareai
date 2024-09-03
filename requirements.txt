@@ -3,3 +3,4 @@ pandas
 notebook
 python-dotenv
 ipython
+ipywidgets
