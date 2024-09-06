@@ -4,3 +4,6 @@ notebook
 python-dotenv
 ipython
 ipywidgets
+matplotlib
+python-Levenshtein
+

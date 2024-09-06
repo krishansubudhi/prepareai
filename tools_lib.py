@@ -1,6 +1,7 @@
 from openai import OpenAI
 
 import re
+import os
 from typing import Any
 import pickle
 from datetime import datetime
@@ -8,9 +9,7 @@ from IPython.display import display, Markdown
 from tool import Tool
 import planner_tool
 import memory_tool
-import json
-
-from dataclasses import dataclass, fields, MISSING
+import json 
 
 def format_metadata_openapi(tool_name: str, metadata: str) -> str:
     # Indent each line of the metadata by 4 spaces
@@ -32,6 +31,7 @@ class Orchestrator:
         self.chat_session = ChatSession()
         self.responder = Responder(chat_session = self.chat_session)
         self.learning_plan_manager = planner_tool.LearningPlanManager(self._call_llm)
+        self.ai_student = AIStudent(self._call_llm)
         self.init_ai_teacher()
 
     def init_ai_teacher(self):
@@ -54,12 +54,12 @@ class Orchestrator:
         # print(self.tools)
         # self.ai_teacher.tools['AITeacher'] = self.ai_teacher
 
-    def _call_llm(self, prompt):
+    def _call_llm(self,  prompt, system_prompt="You are a helpful AI tutor.", model ="gpt-4o-mini" ):
         # Replace with actual call to an LLM API, e.g., OpenAI's GPT
         completion = self.client.chat.completions.create(
-            model="gpt-4o",
+            model=model,
             messages=[
-                {"role": "system", "content": "You are a helpful tutor."},
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
                     "content": prompt
@@ -107,32 +107,49 @@ class Orchestrator:
 
 
 class AITeacher(Tool):
-    def __init__(self, _call_llm, chat_session, tools):
+    def __init__(self, _call_llm, chat_session, tools, log_file="training_data_log.jsonl"):
         self._call_llm = _call_llm
         self.tools = tools
         self.tools['AITeacher'] = self # keep yourself also as a tool.
         self.chat_session = chat_session
-        # print('fetching tool metadata')
+        self.log_file = log_file
+        # Ensure the log file exists
+        if not os.path.exists(self.log_file):
+            with open(self.log_file, "w") as file:
+                file.write("")
 
     def _get_formatted_tool_info(self):
         tool_metadata = {tool_name:tool._get_tool_metadata() for tool_name, tool in self.tools.items()}
         return '\n\n'.join([format_metadata_openapi(tool_name, tool_metadata) for tool_name, tool_metadata in tool_metadata.items()])
-                                             
+
+    def _get_system_prompt(self):
+        system_prompt = '''You are an AI Teacher guiding a student toward their goals. Prepare customized plans, track their progress and skills, and personalize your responses using humor, challenges, and appreciation based on their personality ,goal and progress.
+
+
+        # Instructions:
+
+        - Generate Only Python Code to call the appropriate tools only using self.tools['<toolname>'].method(args).
+        - No New Methods/Classes: Only use provided tools/methods.
+        - No tools except you will output anything to the user. So you are responsible to pass on the results of tool calls to the user.
+        - Memory: Store short but important information in memory which might be needed later.
+        - LearningPlan: Focus on locking a customized learning plan to track progress.
+        - Confirmation: Confirm with user before changing anything.
+        - Responder: User responder to respond to the user. Always respond with a question.
+        - Code guidelines: Always end the python code with either a Responder or AITeacher tool call.
+        '''
+
+        return re.sub(r'^ {8}', '', system_prompt, flags=re.MULTILINE)
+
     def _get_prompt(self, input_text:str, additional_info:dict = {}):
         # Construct prompt template with available tools and context
         prompt = f'''
-        You are an AI Teacher guiding a student toward their goals. Prepare customized plans, track their progress and skills, and personalize your responses using humor, challenges, and appreciation based on their personality ,goal and progreass.
+        You are an AI Teacher guiding a student toward their goals. Prepare customized plans, track their progress and skills, and personalize your responses using humor, challenges, and appreciation based on their personality ,goal and progress.
 
         # Tools Available:
         {self._get_formatted_tool_info()}
 
         # Memory: 
         {self.tools['MemoryManager'].get_memory_snapshot()}
-
-        # Additional Context Gathered:
-
-        # Conversation History (Last 10): 
-        {'- '+ '\n\n- '.join(self.chat_session.get_last_n_messages(11)[:-1])}
 
         # Additional Info: 
         {additional_info}
@@ -142,20 +159,8 @@ class AITeacher(Tool):
         
         # Current Time: {datetime.now()}
 
-
-        # Instructions:
-
-        - Generate Only Python Code to call the appropriate tools only using self.tools['<toolname>'].method(args).
-        - No New Methods/Classes: Only use provided tools/methods.
-        - Memory: Store short but important information in memory which might be needed later.
-        - LearningPlan: Focus on locking a customized learning plan to track progress.
-        - Confirmation: Confirm with user before changing anything.
-        - Responder: User responder to respond to the user. Always respond with a question.
-        - Code guidelines: Always end the python code with either a Responder or AITeacher tool call.
-
-        # Here is the last input from student.
-
-        Student: {input_text}
+        # Conversation History (Last 10): 
+        {'- '+ '\n\n- '.join(self.chat_session.get_last_n_messages(11))}
 
         # Plan code: 
 
@@ -163,18 +168,38 @@ class AITeacher(Tool):
         prompt = re.sub(r'^ {8}', '', prompt, flags=re.MULTILINE)
         return prompt
 
-    def process(self, input_text:str, additional_info:dict = {str, Any}):
+    def _save_training_data(self, prompt: str, code: str):
+        '''Saves the generated prompt and code in JSONL format.'''
+        # Create a dictionary with the prompt and code
+        data_entry = {
+            "prompt": prompt,
+            "code": code,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Serialize the dictionary to a JSON string
+        data_line = json.dumps(data_entry)
+
+        # Append the JSON string to the log file
+        with open(self.log_file, "a") as log_file:
+            log_file.write(data_line + "\n")
+    def process(self, input_text: str, additional_info: dict = None):
         '''
         Plans and executes the next steps based on input text and additional_info, using available tools and past conversation history.
-        Args:
-            input_text= User's input
-            additional_info= Placeholder to pass information during recursive calls.
-        '''
-        # display(Markdown(prompt))
-        code = self._call_llm(self._get_prompt(input_text, additional_info))
-        self._execute_code(code)
-        # return code  # This should return Python code to be executed by the Orchestrator
 
+        Args:
+            input_text (str): User's input.
+            additional_info (dict): Placeholder to pass information during recursive calls.
+        '''
+
+        system_prompt = self._get_system_prompt()
+        prompt = self._get_prompt(input_text, additional_info)
+        code = self._call_llm(prompt, system_prompt = system_prompt, model = "ft:gpt-4o-mini-2024-07-18:macro-mate::A4IWjf67")
+
+        # Save the prompt and code
+        self._save_training_data(system_prompt + prompt, code)
+
+        self._execute_code(code)
 
 class Responder(Tool):
     def __init__(self, chat_session):
@@ -281,9 +306,9 @@ class ConceptTutor(Tool):
     def __init__(self, _call_llm):
         self._call_llm = _call_llm
     
-    def teach(self, topic: str, context: str) -> str:
+    def get_concept(self, topic: str, context: str) -> str:
         """
-        Teach the concepts of a topic. Personalized based on context. Keep it concise but helpful. Adjust difficulty based on context.
+        Return the concepts of a topic. Personalized based on context. Keep it concise but helpful. Adjust difficulty based on context.
         """
         return self._call_llm(f'''You are a friendly AI tutor who can explain concepts  personalized based on the concept. 
         Topic: '{topic}' 
@@ -300,6 +325,20 @@ class ConceptTutor(Tool):
         Doubt: {doubt}
         Clarification: ''')
 
+class AIStudent(Tool):
+    def __init__(self, _call_llm):
+        self._call_llm = _call_llm
+    
+    def respond(self, messages:list[str], personality = None) -> str:
+        """
+        AI student model to generate training data.
+        """
+        return self._call_llm(f'''You are a student who stumbled upon a new AI application to prepare for coding interview.
+        Respond to the ai bot's response. 
+        {'personality = '+ personality if personality else ''}
+        messages: {messages}
+        Your response
+        *student*: ''')
 
 class ChatSession:
     def __init__(self):

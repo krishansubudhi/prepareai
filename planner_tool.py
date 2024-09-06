@@ -43,7 +43,7 @@ class PlanNode:
         self.children[child.subject_name] = child
         
 
-    def update_progress(self, score:float, stats:dict):
+    def update_progress(self, score:float, stats:dict = {}):
         """Updates progress and propagates changes to the parent node."""
         self.progress.update(score, stats)
         if self.parent:
@@ -64,6 +64,7 @@ class LearningPlanManager(Tool):
 
     def __init__(self, _call_llm) -> None:
         self._call_llm = _call_llm
+        self.subject_node_map = {}
 
     def suggest_learning_plan(self, goal: str, special_instruction:str)-> str:
         '''Returns a formatted learning plan based on the user's goal and special_instruction. This does not finalize or store the plan.'''
@@ -97,8 +98,9 @@ class LearningPlanManager(Tool):
                 return found
         return None
 
-    def clear_existing_plan(self):
+    def _clear_existing_plan(self):
         self.root = None
+        self.subject_node_map = {}
     
     def lock_new_plan(self, plan:str):
         """Locks the new plan"""
@@ -106,8 +108,8 @@ class LearningPlanManager(Tool):
             Write python code to create a new Plan. 
 
             Available methods:
-                _create_empty_plan( plan_name:str) -> PlanNode # Initializes the plan.
-                add_subject( subject_name: str, importance: float, parent_node: PlanNode) -> PlanNode # Adds new subject to the plan
+                _create_new_plan( plan_name:str) -> None # Initializes the plan.
+                add_subject(self, subject_name: str, importance: float, parent_subject: str|None = None) -> None # Adds a new subject to the plan under a specified parent node. parent_subject can be None to add subject to plan root.
 
             Plan description: {plan}
 
@@ -118,34 +120,44 @@ class LearningPlanManager(Tool):
         code_to_execute = self._call_llm(prompt)
         self._execute_code(code_to_execute)
 
-    def _create_empty_plan(self, plan_name:str) -> PlanNode:
+    def _create_new_plan(self, plan_name:str) -> None:
+        self._clear_existing_plan()
         self.root = PlanNode(plan_name)
         return self.root
 
-    def add_subject(self, subject_name: str, importance: float, parent_node: PlanNode) -> PlanNode:
-        """Adds a new subject to the plan under a specified parent node."""
+    def add_subject(self, subject_name: str, importance: float, parent_subject: str|None = None) -> None:
+        """Adds a new subject to the plan under a specified parent node. parent_subject can be None to add subject to plan root."""
+        if parent_subject:
+            parent_node = self._find_node(parent_subject)
+            if not parent_node:
+                raise ValueError(f"Parent subject {parent_subject} not part of the plan")
+        else:
+            parent_node = self.root
+        if subject_name in self.subject_node_map:
+            raise ValueError("Subject already exists in the plan. Delete it first.")
+        
         new_node = PlanNode(subject_name=subject_name, importance=importance)
         parent_node.add_child(new_node)
-        return new_node
+        self.subject_node_map[subject_name] = new_node
     
-    def delete_subject(self, subject_name: str) -> PlanNode:
-        """Adds a new subject to the plan under a specified parent node."""
+    def delete_subject(self, subject_name: str):
+        """Adds a new subject to the plan under a specified parent node. Raises ValueError if subject is not part of the plan."""
         node = self._find_node(subject_name)
         if not node:
             raise ValueError(f"{subject_name} not part of plan.")
         else:
             del node.parent[subject_name]
 
-    def update_progress(self, subject_name: str, score: float, stats: dict):
+    def update_progress(self, subject_name: str, score: float):
         """Updates the progress for a specific subject and propagates changes."""
         node = self._find_node(subject_name)
         if node:
-            node.update_progress(score, stats)
+            node.update_progress(score, stats = {})
         else:
             raise ValueError("Node not found.")
 
-    def get_plan_tree_markdown(self, subject_name: str = None) -> str:
-        """Returns learning plan in a readable markdown format."""
+    def get_plan_tree_markdown(self, subject_name: str|None = None) -> str:
+        """Returns learning plan in a readable markdown format. subject_name is optional."""
         node = self.root 
         if subject_name:
             node = self._find_node(subject_name=subject_name, node=self.root)

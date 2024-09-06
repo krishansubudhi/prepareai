@@ -34,6 +34,21 @@ class Tool():
                     # Inspect the method if it's callable
                     signature = inspect.signature(attr)
                     docstring = inspect.getdoc(attr)
+
+                    params = signature.parameters
+                    param_strings = []
+
+                    # Process each parameter to show default values
+                    for param_name, param in params.items():
+                        if param.default is inspect.Parameter.empty:
+                            param_strings.append(param_name)  # No default value
+                        else:
+                            param_strings.append(f"{param_name}={param.default!r}")  # With default value
+
+                    # Join parameters with commas and construct the method signature
+                    param_list = ", ".join(param_strings)
+                    method_signature = f"{name}({param_list})"
+                    
                     method_info = f"* `{name}{signature}` \t{'# ' + docstring.strip() if docstring else ''}"
                     tool_metadata.append(method_info)
                 except Exception as e:
@@ -41,9 +56,10 @@ class Tool():
 
         return "\n\n".join(tool_metadata)
 
-    def _execute_code(self, code_to_execute):
+    @classmethod
+    def _execute_code(cls, code_to_execute):
         # Extract code from Markdown (assuming code is enclosed in triple backticks)
-        code_pattern = re.compile(r'```(?:python)?\n(.*?)\n```', re.DOTALL)
+        code_pattern = re.compile(r'```(?:python)?\n(.*)\n```', re.DOTALL)
         match = code_pattern.search(code_to_execute)
         
         if match:
@@ -53,6 +69,6 @@ class Tool():
             try:
                 exec(code, globals(), locals())
             except Exception as e:
-                print(f"Error executing LLM-generated code: {e}")
+                raise Exception(f"Error executing LLM-generated code: {e}")
         else:
             print("No valid code block found.")
