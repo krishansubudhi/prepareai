@@ -14,10 +14,7 @@ resources = (
 
 
 # Responding to the user with the suggested resources
-self.tools['Responder'].respond(
-    f"'Introduction to Machine Learning' is not part of the learning plan. Do you want me to add it to the plan?\
-\
-{resources}"
+self.tools['Responder'].respond(f"'Introduction to Machine Learning' is not part of the learning plan. Do you want me to add it to the plan?\n{resources}"
 )
 
 # Updating memory with the current topic

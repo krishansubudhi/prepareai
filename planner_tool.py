@@ -66,7 +66,7 @@ class LearningPlanManager(Tool):
         self._call_llm = _call_llm
         self.subject_node_map = {}
 
-    def suggest_learning_plan(self, goal: str, special_instruction:str)-> str:
+    def suggest_learning_plan(self, goal: str, special_instruction:str = None)-> str:
         '''Returns a formatted learning plan based on the user's goal and special_instruction. This does not finalize or store the plan.'''
         # Generate a plan using the LLM
         plan_suggestion_prompt = f'''Create a new learning plan for a student with the goal: {goal}, special_instruction: {special_instruction}. 
@@ -175,6 +175,6 @@ class LearningPlanManager(Tool):
     
 
     def _get_tool_metadata(self):
-        excludes = ['get_progress', 'update_progress', 'get_plan', 'clear_existing_plan', 'add_subject','delete_subject','get_plan_tree_markdown'] if not self.root else []
+        excludes = ['get_progress', 'update_progress', 'clear_existing_plan', 'add_subject','delete_subject'] if not self.root else []
         return super()._get_tool_metadata(excludes=excludes)
 
