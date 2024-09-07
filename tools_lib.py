@@ -72,7 +72,7 @@ class Orchestrator:
     def process_user_input(self, user_input):
         # Calls the AI Teacher with the necessary context
         self.chat_session.update_session("student", user_input)
-        self.ai_teacher.process(user_input)
+        self.ai_teacher.process()
         self.save_state(f'states/{self.session_name}.pkl')
 
     def save_state(self, filename):
@@ -140,11 +140,9 @@ class AITeacher(Tool):
 
         return re.sub(r'^ {8}', '', system_prompt, flags=re.MULTILINE)
 
-    def _get_prompt(self, input_text:str, additional_info:dict = {}):
+    def _get_prompt(self, additional_info:dict = {}):
         # Construct prompt template with available tools and context
         prompt = f'''
-        You are an AI Teacher guiding a student toward their goals. Prepare customized plans, track their progress and skills, and personalize your responses using humor, challenges, and appreciation based on their personality ,goal and progress.
-
         # Tools Available:
         {self._get_formatted_tool_info()}
 
@@ -163,7 +161,6 @@ class AITeacher(Tool):
         {'- '+ '\n\n- '.join(self.chat_session.get_last_n_messages(11))}
 
         # Plan code: 
-
         '''
         prompt = re.sub(r'^ {8}', '', prompt, flags=re.MULTILINE)
         return prompt
@@ -183,17 +180,15 @@ class AITeacher(Tool):
         # Append the JSON string to the log file
         with open(self.log_file, "a") as log_file:
             log_file.write(data_line + "\n")
-    def process(self, input_text: str, additional_info: dict = None):
+    def process(self, additional_info: dict = None):
         '''
-        Plans and executes the next steps based on input text and additional_info, using available tools and past conversation history.
+        Plans and executes the next steps using available tools and past conversation history.
 
         Args:
-            input_text (str): User's input.
             additional_info (dict): Placeholder to pass information during recursive calls.
         '''
-
         system_prompt = self._get_system_prompt()
-        prompt = self._get_prompt(input_text, additional_info)
+        prompt = self._get_prompt(additional_info)
         code = self._call_llm(prompt, system_prompt = system_prompt, model = "ft:gpt-4o-mini-2024-07-18:macro-mate::A4IWjf67")
 
         # Save the prompt and code
