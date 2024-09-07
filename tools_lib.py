@@ -189,7 +189,7 @@ class AITeacher(Tool):
         '''
         system_prompt = self._get_system_prompt()
         prompt = self._get_prompt(additional_info)
-        code = self._call_llm(prompt, system_prompt = system_prompt, model = "ft:gpt-4o-mini-2024-07-18:macro-mate::A4IWjf67")
+        code = self._call_llm(prompt, system_prompt = system_prompt, model = "ft:gpt-4o-mini-2024-07-18:macro-mate::A4quEIeN")
 
         # Save the prompt and code
         self._save_training_data(system_prompt + prompt, code)

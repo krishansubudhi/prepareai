@@ -56,8 +56,7 @@ class Tool():
 
         return "\n\n".join(tool_metadata)
 
-    @classmethod
-    def _execute_code(cls, code_to_execute):
+    def _execute_code(self, code_to_execute):
         # Extract code from Markdown (assuming code is enclosed in triple backticks)
         code_pattern = re.compile(r'```(?:python)?\n(.*)\n```', re.DOTALL)
         match = code_pattern.search(code_to_execute)
