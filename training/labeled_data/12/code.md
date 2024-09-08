@@ -12,10 +12,6 @@ mcq_question = self.tools['MCQExaminer'].get_question(
     difficulty='intermediate'
 )
 self.tools['Responder'].respond(
-    f"If you understood the concept, let's test your knowledge:\
-\
-{mcq_question}\
-\
-Can you answer this question?"
+    f"If you understood the concept, let's test your knowledge:\n\n{mcq_question}\n\nCan you answer this question?"
 )
 ```

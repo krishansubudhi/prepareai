@@ -140,6 +140,14 @@ class AITeacher(Tool):
 
         return re.sub(r'^ {8}', '', system_prompt, flags=re.MULTILINE)
 
+    def _indent_except_first(self, text, indent='    '):
+        lines = text.split('\n')
+        if len(lines) <= 1:
+            return text
+        # Keep the first line as is, and indent all other lines
+        return lines[0] + '\n' + '\n'.join(indent + line for line in lines[1:])
+
+
     def _get_prompt(self, additional_info:dict = {}):
         # Construct prompt template with available tools and context
         prompt = f'''
@@ -158,7 +166,7 @@ class AITeacher(Tool):
         # Current Time: {datetime.now()}
 
         # Conversation History (Last 10): 
-        {'- '+ '\n\n- '.join(self.chat_session.get_last_n_messages(11))}
+        {'- '+ '\n\n- '.join([self._indent_except_first(text) for text in self.chat_session.get_last_n_messages(10)])+'\n'}
 
         # Plan code: 
         '''
@@ -194,7 +202,11 @@ class AITeacher(Tool):
         # Save the prompt and code
         self._save_training_data(system_prompt + prompt, code)
 
-        self._execute_code(code)
+        try:
+            self._execute_code(code)
+        except Exception as e:
+            # Retry n times later.
+            self.tools["Responder"].respond("Sorry, I am facing internal error. Can you try again?\n"+e)
 
 class Responder(Tool):
     def __init__(self, chat_session):
@@ -301,7 +313,7 @@ class ConceptTutor(Tool):
     def __init__(self, _call_llm):
         self._call_llm = _call_llm
     
-    def get_concept(self, topic: str, context: str) -> str:
+    def get_concept(self, topic: str, context: str|None = None) -> str:
         """
         Return the concepts of a topic. Personalized based on context. Keep it concise but helpful. Adjust difficulty based on context.
         """
@@ -310,7 +322,7 @@ class ConceptTutor(Tool):
         Context: {context}
         Explanation: ''')
 
-    def clear_doubts(self,  doubt: str, context: str) -> str:
+    def clear_doubts(self,  doubt: str, context: str|None = None) -> str:
         """
         clear doubt based on the give context. 
         """

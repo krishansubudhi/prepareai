@@ -6,9 +6,9 @@ self.tools['MemoryManager'].update_memory('preference_arrays_and_strings_difficu
 coding_question = self.tools['CodingPracticeTutor'].get_question(topic='arrays_and_strings', difficulty='advanced')
 
 # Responding with the new challenge for the student.
-self.tools['Responder'].respond(f"Alright, here's a challenge for you:\
-\
-{coding_question}\
-\
-Ready to take this on? Let me know if you need any hints or have questions!")
+self.tools['Responder'].respond(f"""Alright, here's a challenge for you:
+
+{coding_question}
+
+Ready to take this on? Let me know if you need any hints or have questions!""")
 ```

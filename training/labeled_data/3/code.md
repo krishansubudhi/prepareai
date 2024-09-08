@@ -49,9 +49,6 @@ self.tools['LearningPlanManager'].lock_new_plan(
     """
 )
 
-# Update memory that plan has been locked
-self.tools['MemoryManager'].update_memory("learning_plan_locked", "True")
-
 # Respond to the user
 self.tools['Responder'].respond("Great! The learning plan is locked and we are ready to start. Shall we begin with the first topic, Arrays and Strings?")
 ```

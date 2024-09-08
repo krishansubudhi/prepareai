@@ -15,10 +15,4 @@ response = self.tools['CodingPracticeTutor'].grade_answer(
 # Respond to the student with the grading result.
 self.tools['Responder'].respond(response)
 
-# Process the grading output with the AITeacher tool for further analysis.
-self.tools['AITeacher'].process(
-    input_text="AITeacher(thought): I have asked the grader to grade the output. Process the output and respond.",
-    additional_info={'grader_response': response}
-)
-
 ```

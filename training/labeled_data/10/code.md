@@ -64,15 +64,11 @@ else:
     current_substr_len += 1
     longest_substr_len = max(longest_substr_len, current_substr_len)
     current_substr_chars.add(c)
-    return longest_substr_len"""
+    return longest_substr_len
+"""
 
 grader_response = self.tools['CodingPracticeTutor'].grade_answer(question = question, answer = answer)
 
-self.tools['Responder'].respond({grader_response})
+self.tools['Responder'].respond(grader_response)
 
-# Process the new grading output with the AITeacher tool.
-self.tools['AITeacher'].process(
-    input_text="AITeacher(thought): I have asked grader to grade student's response. Process the report and respond.",
-    additional_info={'grader_response': grader_response}
-)
 ```

@@ -9,11 +9,10 @@ advanced_array_question = self.tools['CodingPracticeTutor'].get_question(
 )
 
 # Respond with the intermediate-level question and offer hints if needed.
-self.tools['Responder'].respond(
-    f"Since you have a basic understanding of array manipulation, let's challenge you with an intermediate-level question.\
-\
-{advanced_array_question}\
-\
-Can you solve this? Let me know if you need hints."
+self.tools['Responder'].respond(f"""Since you have a basic understanding of array manipulation, let's challenge you with an intermediate-level question.
+
+{advanced_array_question}
+
+Can you solve this? Let me know if you need hints."""
 )
 ```
