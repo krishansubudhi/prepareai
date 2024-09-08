@@ -197,7 +197,7 @@ class AITeacher(Tool):
         '''
         system_prompt = self._get_system_prompt()
         prompt = self._get_prompt(additional_info)
-        code = self._call_llm(prompt, system_prompt = system_prompt, model = "ft:gpt-4o-mini-2024-07-18:macro-mate::A4quEIeN")
+        code = self._call_llm(prompt, system_prompt = system_prompt, model = "ft:gpt-4o-mini-2024-07-18:macro-mate::A54aVOOO")
 
         # Save the prompt and code
         self._save_training_data(system_prompt + prompt, code)
@@ -206,7 +206,7 @@ class AITeacher(Tool):
             self._execute_code(code)
         except Exception as e:
             # Retry n times later.
-            self.tools["Responder"].respond("Sorry, I am facing internal error. Can you try again?\n"+e)
+            self.tools["Responder"].respond(f"Sorry, I am facing internal error. Can you try again?\n{e}")
 
 class Responder(Tool):
     def __init__(self, chat_session):

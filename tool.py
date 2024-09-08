@@ -68,6 +68,6 @@ class Tool():
             try:
                 exec(code, globals(), locals())
             except Exception as e:
-                raise Exception(f"Error executing LLM-generated code: {e}")
+                raise Exception(f"Error executing LLM-generated code: {str(e)}")
         else:
             print("No valid code block found.")
