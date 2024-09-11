@@ -8,9 +8,7 @@
 #### 1. **User Interface (UI)**
 - **Goal Selection Panel:** Users will start by selecting their goal, e.g., "Practice coding for Company X interview" or "Prepare for a specific exam."
 - **Learning Dashboard:** Display a summary of the user's progress, current learning plan, upcoming tasks, and achievements.
-- **Learning Dashboard:** Display a summary of the user's progress, current learning plan, upcoming tasks, and achievements.
 - **Interactive Mock Interview Panel:** Allows users to engage in real-time coding interviews, receiving feedback afterward.
-- 
 - **Chat Box**: Provides a conversational interface for interacting with AITutor. Users can:
   - Provide answers, confirmations and prefrences.
   - Ask for help with questions.
