@@ -73,26 +73,6 @@ For simplicity, all tool APIs should take input in primitive datatypes (int, str
 
 ---
 
-### **Unique Features:**
-
-#### 1. **Dynamic Orchestration with Code Execution**
-- **Why Unique:** Unlike traditional chatbots that are limited to conversational responses, *Prepared.ai* will dynamically generate Python code to call other tools, enabling it to perform more complex actions.
-  
-#### 2. **Adaptive Learning Paths**
-- **Personalization:** The LearningPlanManager dynamically modifies the learning plan based on user performance, and the system can shift focus areas as needed.
-  
-#### 3. **Memory-Driven Personalization**
-- **Continuous Progress Tracking:** The MemoryManager tracks performance history, enabling *Prepared.ai* to adjust challenges and revisit past weak areas seamlessly. This adds depth to the learning experience by ensuring long-term retention.
-
-#### 4. **Real-Time Problem Generation and Mock Interviews**
-- **End-to-End Simulation:** Users can experience the entire interview cycle (from preparation to coding problems to mock interviews) without leaving the platform.
-- **Mock Interviews with Feedback:** Real-time feedback and interaction, simulating live interviews, making users better prepared.
-
-#### 5. **Integrated Toolset for Learning Optimization**
-- **Multiple Tools**: The system integrates multiple tools for various facets of learning, like coding practice, progress tracking, and mock interviews, giving a holistic experience rather than just being a conversational chatbot.
-
----
-
 ### **Differentiation from Generic Chatbots:**
 
 1. **True Multi-Agent Orchestration:**
