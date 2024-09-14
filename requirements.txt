@@ -6,4 +6,7 @@ ipython
 ipywidgets
 matplotlib
 python-Levenshtein
-
+transformers
+torch
+accelerate
+bitsandbytes
