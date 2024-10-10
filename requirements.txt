@@ -9,4 +9,4 @@ python-Levenshtein
 transformers
 torch
 accelerate
-bitsandbytes
+bitsandbytes>0.37.0

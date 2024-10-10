@@ -14,8 +14,42 @@ The goal of this document is to outline steps needed to serve, train (SFT and RL
   - [x] Test model loading and serving locally.
     -  [Notebook](training/sft_ai_teacher_llama.ipynb)
   - [ ] Test model loading and inference in colab
+    - [Colab](https://colab.research.google.com/drive/1uJvRhpbbF5S__msauT-oE-qy4IehCYdt#scrollTo=V5Tn7wbGhBhf)
+    - Colab GPU (15GB) is not enough. Some weights are being stored in CPU. Time taken to predict 20 tokens is 22 seconds. In macbook it was 3 minutes. I will see if i can quantize the model and infer.
   - [ ] Serve the model in a GPU serving platform
   - [ ] Test the app loaclly by calling the API.
+
+Notes:
+
+Yes, if you change the runtime in Google Colab (for example, switching between CPU, GPU, or TPU), **you will lose your session cache** because the Colab environment is reset when the runtime changes. This means that:
+
+- All variables, files stored in `/content`, and cached data (such as Hugging Face model cache) will be cleared.
+- Any models or libraries you have downloaded or any session-specific data will no longer be available unless you save it somewhere persistent, like Google Drive.
+
+### How to Preserve Session Cache When Changing Runtime:
+1. **Mount Google Drive**:
+   Before changing the runtime, save your cache or other important files to Google Drive:
+
+   ```python
+   from google.colab import drive
+   drive.mount('/content/drive')
+   
+   # Copy the cache to Google Drive
+   !cp -r /root/.cache/huggingface/ /content/drive/MyDrive/huggingface_cache/
+   ```
+
+2. **Change the Runtime**:
+   Go to **Runtime > Change runtime type** and select the desired hardware (e.g., from GPU to CPU).
+
+3. **Restore the Cache**:
+   After changing the runtime, restore the cache from Google Drive:
+
+   ```bash
+   !cp -r /content/drive/MyDrive/huggingface_cache/ /root/.cache/huggingface/
+   ```
+
+This way, even though the runtime changes and resets the environment, you can reload your cache or important files.
+
 ---
 
 ### **Step 2: Train SFT Model on LLaMA 8B and serve it**
